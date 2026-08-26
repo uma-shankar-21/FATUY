@@ -2,8 +2,8 @@ from datetime import date
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel, Field, model_validator
-from typing import Literal
+from pydantic import BaseModel, model_validator
+
 
 class TransactionSearchRequest(BaseModel):
     user_id: str
@@ -16,9 +16,9 @@ class TransactionSearchRequest(BaseModel):
     status: Optional[str] = None
 
     transaction_date: Optional[date] = None
-
     start_date: Optional[date] = None
     end_date: Optional[date] = None
+    limit: Optional[int] = None
 
     @model_validator(mode="after")
     def validate_dates(self):
@@ -49,37 +49,3 @@ class TransactionSearchRequest(BaseModel):
             )
 
         return self
-
-
-class AggregationRequest(BaseModel):
-    operation: Literal[
-        "sum",
-        "count",
-        "average",
-        "min",
-        "max"
-    ]
-
-    field: str | None = None
-
-
-class TransactionSearchRequest(BaseModel):
-
-    user_id: str
-
-    transaction_type: str | None = None
-    amount: float | None = None
-    description: str | None = None
-    merchant: str | None = None
-    category: str | None = None
-    status: str | None = None
-
-    transaction_date: str | None = None
-    start_date: str | None = None
-    end_date: str | None = None
-
-    response_fields: list[str] | None = None
-
-    aggregation: AggregationRequest | None = None
-
-    limit: int | None = None

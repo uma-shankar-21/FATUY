@@ -15,7 +15,15 @@ async def get_transactions(
     transaction_date: str | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
+    limit: str | None = None,
 ) -> MCPToolResult:
+
+    cleaned_limit = None
+    if limit is not None and str(limit).strip() != "":
+        try:
+            cleaned_limit = int(limit)
+        except (TypeError, ValueError):
+            cleaned_limit = None
 
     payload = {
         "user_id": user_id,
@@ -28,12 +36,13 @@ async def get_transactions(
         "transaction_date": transaction_date,
         "start_date": start_date,
         "end_date": end_date,
+        "limit": cleaned_limit,
     }
 
     payload = {
         key: value
         for key, value in payload.items()
-        if value is not None
+        if value not in (None, "", [])
     }
 
     try:
