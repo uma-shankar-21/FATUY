@@ -18,5 +18,5 @@ passlib[bcrypt]
 groq
 
 httpx
-
+alembic
 python-multipart
