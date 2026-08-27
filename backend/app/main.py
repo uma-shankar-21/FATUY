@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from app.api.v1.router import api_router
 from app.ai.router import router
+from app.services.memory.router import router as memory_router
 
 app = FastAPI(
     title="Banking AI Assistant",
@@ -13,7 +14,7 @@ app.include_router(
 )
 
 app.include_router(router)
-
+app.include_router(memory_router)
 @app.get("/")
 async def root():
     return {

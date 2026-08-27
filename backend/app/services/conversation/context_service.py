@@ -1,7 +1,12 @@
+import uuid
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.message import Message
+
+
+SHORT_TERM_MEMORY_LIMIT = 20
 
 
 class ContextService:
@@ -9,9 +14,9 @@ class ContextService:
     async def get_context(
         self,
         db: AsyncSession,
-        conversation_id,
-        limit: int = 20,
-    ) -> list[dict]:
+        conversation_id: uuid.UUID,
+        limit: int = SHORT_TERM_MEMORY_LIMIT,
+    ) -> list[dict[str, str]]:
 
         result = await db.execute(
             select(Message)
@@ -26,7 +31,7 @@ class ContextService:
 
         messages = result.scalars().all()
 
-        messages = reversed(messages)
+        messages.reverse()
 
         return [
             {
