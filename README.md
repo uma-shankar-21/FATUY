@@ -1,23 +1,40 @@
 # Banking AI Assistant
 FATUY(Financial Assistant That Understands You)
 
-An AI-powered banking assistant built with a distributed, event-driven architecture using Python, FastAPI, PostgreSQL, Redis, Kafka, pgvector, LLMs, and MCP.
+An AI-powered banking assistant built with FastAPI, React, PostgreSQL, Redis, Kafka, pgvector, and Large Language Models.
 
-The system provides contextual banking assistance by combining:
-
-- Short-term conversational memory
-- Long-term AI-generated memory
-- Semantic memory retrieval
-- Real-time banking data
-- Event-driven background processing
-- Context-aware prompt construction
-- LLM validation and fallback mechanisms
-
-The project is designed to demonstrate a practical architecture for building production-oriented AI applications rather than a simple chatbot.
+The system is designed around a memory-aware AI architecture that combines short-term conversation context, long-term user memory, banking data, semantic retrieval, asynchronous event processing, and real-time data access.
 
 ---
 
-## Architecture Overview
+## Features
+
+- AI-powered banking assistant
+- Multi-turn conversations with short-term memory
+- Redis-based session storage with sliding expiration
+- Automatic session expiration after 30 minutes of inactivity
+- Expired conversation persistence using PostgreSQL JSONB
+- Kafka-based asynchronous memory processing
+- Long-term memory generation using LLM summarization
+- Persistent user memory storage
+- Semantic retrieval using pgvector
+- Context selection for relevant long-term memories
+- Banking-aware context generation
+- Transaction, account, loan, and loan payment data access
+- REST APIs using FastAPI
+- PostgreSQL with pgvector
+- Redis for short-term session memory
+- Kafka for asynchronous event processing
+- LLM provider abstraction
+- Groq LLM integration
+- Model Context Protocol (MCP) integration for real-time data access
+- Context-aware mega-prompt generation
+- Prompt validation and iterative refinement
+- Docker-based development environment
+
+---
+
+# Architecture
 
 ```text
                            ┌─────────────────────┐
