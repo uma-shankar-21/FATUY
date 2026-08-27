@@ -23,11 +23,6 @@ class UserMemory(Base):
         index=True,
     )
 
-    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        nullable=True,
-    )
-
     content: Mapped[str] = mapped_column(
         Text,
         nullable=False,

@@ -1,4 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    status,
+)
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -10,16 +16,9 @@ from app.schemas.ai import (
     AIChatResponse,
 )
 
-from app.services.conversation.conversation_service import (
-    conversation_service,
-)
-
-from app.services.conversation.message_service import (
-    message_service,
-)
-
-from app.services.conversation.context_service import (
-    context_service,
+from app.services.session.session_service import (
+    session_service,
+    SessionExpiredError,
 )
 
 from app.services.banking.banking_context_builder import (
@@ -51,56 +50,65 @@ async def chat(
 ):
 
     # ==========================================================
-    # 1. CREATE OR USE EXISTING CONVERSATION
+    # 1. CREATE NEW SESSION OR VALIDATE EXISTING SESSION
     # ==========================================================
 
-    if request.conversation_id is None:
+    if request.session_id is None:
 
-        conversation = (
-            await conversation_service.create_conversation(
-                db=db,
-                user_id=request.user_id,
-            )
+        session_id = await session_service.create_session(
+            user_id=request.user_id,
         )
-
-        conversation_id = conversation.id
 
     else:
 
-        conversation_id = request.conversation_id
+        session_id = request.session_id
+
+        try:
+
+            await session_service.get_session(
+                session_id=session_id,
+                user_id=request.user_id,
+            )
+
+        except SessionExpiredError as error:
+
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=str(error),
+            )
 
 
     # ==========================================================
-    # 2. STORE CURRENT USER MESSAGE
+    # 2. STORE USER MESSAGE IN REDIS
+    #
+    # TTL resets to 30 minutes
     # ==========================================================
 
-    await message_service.create_message(
-        db=db,
-        conversation_id=conversation_id,
+    await session_service.add_message(
+        session_id=session_id,
+        user_id=request.user_id,
         role="user",
         content=request.message,
     )
 
 
     # ==========================================================
-    # 3. LOAD SHORT-TERM MEMORY
-    #
-    # Last 20 messages from the current conversation
+    # 3. LOAD SHORT-TERM MEMORY FROM REDIS
     # ==========================================================
 
-    conversation_messages = (
-        await context_service.get_context(
-            db=db,
-            conversation_id=conversation_id,
+    short_term_messages = (
+        await session_service.get_messages(
+            session_id=session_id,
+            user_id=request.user_id,
             limit=20,
         )
     )
 
 
     # ==========================================================
-    # 4. LOAD LONG-TERM MEMORY
+    # 4. LOAD LONG-TERM MEMORY FROM POSTGRES
     #
-    # User memories stored in memories table
+    # Later Phase 9 will improve this using vector retrieval.
     # ==========================================================
 
     long_term_memories = (
@@ -126,25 +134,18 @@ async def chat(
 
 
     # ==========================================================
-    # 6. BUILD FINAL MESSAGES / MEGA PROMPT
-    #
-    # Contains:
-    #
-    # - System instructions
-    # - Long-term memory
-    # - Banking context
-    # - Short-term conversation memory
+    # 6. BUILD FINAL PROMPT
     # ==========================================================
 
     messages = prompt_service.build_messages(
-        conversation_messages=conversation_messages,
+        conversation_messages=short_term_messages,
         long_term_memories=long_term_memories,
         banking_context=banking_context,
     )
 
 
     # ==========================================================
-    # DEBUG: PRINT EXACT DATA SENT TO AI
+    # DEBUG
     # ==========================================================
 
     print("\n")
@@ -176,24 +177,25 @@ async def chat(
 
 
     # ==========================================================
-    # 8. SEND REQUEST TO AI
+    # 8. ASK AI
     # ==========================================================
 
     result = await provider.chat(
         messages=messages,
     )
 
-
     assistant_response = result["content"]
 
 
     # ==========================================================
-    # 9. STORE AI RESPONSE
+    # 9. STORE ASSISTANT RESPONSE IN REDIS
+    #
+    # TTL resets again to 30 minutes
     # ==========================================================
 
-    await message_service.create_message(
-        db=db,
-        conversation_id=conversation_id,
+    await session_service.add_message(
+        session_id=session_id,
+        user_id=request.user_id,
         role="assistant",
         content=assistant_response,
     )
@@ -204,6 +206,6 @@ async def chat(
     # ==========================================================
 
     return AIChatResponse(
-        conversation_id=conversation_id,
+        session_id=session_id,
         response=assistant_response,
     )

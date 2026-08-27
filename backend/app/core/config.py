@@ -32,5 +32,6 @@ class Settings:
     AI_PROVIDER_PRIORITY: str = "ollama,vllm"
 
     AI_MAX_TOOL_ROUNDS = 3
-
+    SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS"))
+    REDIS_DB = int(os.getenv("REDIS_DB", 0))
 settings = Settings()

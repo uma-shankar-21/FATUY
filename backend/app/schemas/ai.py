@@ -1,21 +1,21 @@
-import uuid
+from uuid import UUID
 
 from pydantic import BaseModel
 
 
 class AIChatRequest(BaseModel):
 
-    user_id: uuid.UUID
+    user_id: UUID
 
     message: str
 
-    conversation_id: uuid.UUID | None = None
+    session_id: UUID | None = None
 
-    provider: str = "ollama"
+    provider: str | None = None
 
 
 class AIChatResponse(BaseModel):
 
-    conversation_id: uuid.UUID
+    session_id: UUID
 
     response: str
