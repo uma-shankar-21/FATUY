@@ -1,4 +1,5 @@
 # Banking AI Assistant
+FATUY(Financial Assistant That Understands You)
 
 An AI-powered banking assistant built with a distributed, event-driven architecture using Python, FastAPI, PostgreSQL, Redis, Kafka, pgvector, LLMs, and MCP.
 
