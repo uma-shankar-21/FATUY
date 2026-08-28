@@ -5,6 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.memory import UserMemory
 
+from app.services.memory.embedding_service import (
+    embedding_service,
+)
+
 
 class MemoryService:
 
@@ -14,19 +18,36 @@ class MemoryService:
         user_id: UUID,
         content: str,
         memory_type: str,
-        #conversation_id: UUID | None = None,
         importance: int = 1,
     ) -> UserMemory:
 
+        # ==========================================
+        # 1. GENERATE EMBEDDING
+        # ==========================================
+
+        embedding = (
+            await embedding_service.generate_embedding(
+                text=content,
+            )
+        )
+
+        # ==========================================
+        # 2. CREATE MEMORY
+        # ==========================================
+
         memory = UserMemory(
             user_id=user_id,
-            #conversation_id=conversation_id,
             content=content,
             memory_type=memory_type,
             importance=importance,
+            embedding=embedding,
         )
 
         db.add(memory)
+
+        # ==========================================
+        # 3. SAVE TO POSTGRES
+        # ==========================================
 
         await db.commit()
 
@@ -34,27 +55,49 @@ class MemoryService:
 
         return memory
 
-    async def get_memories(
+    async def search_relevant_memories(
         self,
         db: AsyncSession,
         user_id: UUID,
-        limit: int = 20,
+        query: str,
+        limit: int = 5,
     ) -> list[UserMemory]:
 
+        # ==========================================
+        # 1. GENERATE QUERY EMBEDDING
+        # ==========================================
+
+        query_embedding = (
+            await embedding_service.generate_embedding(
+                text=query,
+            )
+        )
+
+        # ==========================================
+        # 2. SEMANTIC VECTOR SEARCH
+        # ==========================================
+
         result = await db.execute(
-            select(UserMemory)
+            select(
+                UserMemory
+            )
             .where(
                 UserMemory.user_id == user_id
             )
+            .where(
+                UserMemory.embedding.is_not(None)
+            )
             .order_by(
-                UserMemory.importance.desc(),
-                UserMemory.created_at.desc(),
+                UserMemory.embedding.cosine_distance(
+                    query_embedding
+                )
             )
             .limit(limit)
         )
 
-        return result.scalars().all()
+        memories = result.scalars().all()
 
+        return memories
 
     async def update_memory(
         self,
@@ -76,12 +119,25 @@ class MemoryService:
         memory = result.scalar_one_or_none()
 
         if memory is None:
+
             return None
 
+        # ==========================================
+        # UPDATE CONTENT + EMBEDDING
+        # ==========================================
+
         if content is not None:
+
             memory.content = content
 
+            memory.embedding = (
+                await embedding_service.generate_embedding(
+                    text=content,
+                )
+            )
+
         if importance is not None:
+
             memory.importance = importance
 
         await db.commit()
@@ -109,6 +165,7 @@ class MemoryService:
         memory = result.scalar_one_or_none()
 
         if memory is None:
+
             return False
 
         await db.delete(memory)
@@ -117,16 +174,19 @@ class MemoryService:
 
         return True
 
+
     async def get_memory_context(
         self,
         db: AsyncSession,
         user_id: UUID,
+        query: str,
         limit: int = 20,
     ) -> list[dict]:
 
-        memories = await self.get_memories(
+        relevant_memories = await self.search_relevant_memories(
             db=db,
             user_id=user_id,
+            query=query,
             limit=limit,
         )
 
@@ -136,7 +196,8 @@ class MemoryService:
                 "memory_type": memory.memory_type,
                 "importance": memory.importance,
             }
-            for memory in memories
+            for memory in relevant_memories
         ]
+
 
 memory_service = MemoryService()

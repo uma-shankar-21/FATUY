@@ -115,6 +115,7 @@ async def chat(
         await memory_service.get_memory_context(
             db=db,
             user_id=request.user_id,
+            query=request.message,
             limit=20,
         )
     )
