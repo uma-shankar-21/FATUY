@@ -23,6 +23,15 @@ from app.workers.session_expiration_worker import (
     session_expiration_worker,
 )
 
+from app.api.routes.customer import router as customer_router
+
+from app.api.routes.auth import (
+    router as auth_router,
+)
+
+from app.api.routes.dashboard import (
+    router as dashboard_router,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +113,15 @@ app.include_router(
     memory_router,
 )
 
+app.include_router(customer_router)
+
+app.include_router(
+    auth_router
+)
+
+app.include_router(
+    dashboard_router
+)
 
 @app.get("/")
 async def root():
