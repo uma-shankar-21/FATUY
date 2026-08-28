@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 
 from app.schemas.customer import (
-    CustomerCreate,
     CustomerLogin,
     CustomerResponse,
     LoginResponse,
@@ -30,39 +29,6 @@ router = APIRouter(
 
 
 # ==========================================================
-# CREATE CUSTOMER
-# ==========================================================
-
-@router.post(
-    "",
-    response_model=CustomerResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_customer(
-    data: CustomerCreate,
-    db: AsyncSession = Depends(get_db),
-):
-
-    try:
-
-        customer = (
-            await customer_service.create_customer(
-                db=db,
-                data=data,
-            )
-        )
-
-        return customer
-
-    except ValueError as error:
-
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(error),
-        )
-
-
-# ==========================================================
 # GET CUSTOMER
 # ==========================================================
 
@@ -75,21 +41,16 @@ async def get_customer(
     db: AsyncSession = Depends(get_db),
 ):
 
-    customer = (
-        await customer_service.get_customer(
-            db=db,
-            customer_id=customer_id,
-        )
+    customer = await customer_service.get_customer(
+        db=db,
+        customer_id=customer_id,
     )
 
     if customer is None:
 
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={
-                "error": "Customer not found",
-                "customer_id": str(customer_id),
-            },
+            detail="Customer not found.",
         )
 
     return customer
@@ -108,12 +69,10 @@ async def login_customer(
     db: AsyncSession = Depends(get_db),
 ):
 
-    result = (
-        await customer_service.login_customer(
-            db=db,
-            identifier=data.identifier.strip(),
-            password=data.password,
-        )
+    result = await customer_service.login_customer(
+        db=db,
+        identifier=data.identifier.strip(),
+        password=data.password,
     )
 
     if result is None:
