@@ -9,11 +9,9 @@ from alembic import context
 
 from app.core.database import Base, DATABASE_URL
 
+from app.models.expired_conversation import ExpiredConversation
 from app.models.memory import UserMemory
-
-from app.models.expired_conversation import (
-    ExpiredConversation,
-)
+from app.models.outbox import OutboxMessage
 
 from app.models.existing.transaction import Transaction
 from app.models.existing.loan import Loan

@@ -14,13 +14,13 @@ class MemoryService:
         user_id: UUID,
         content: str,
         memory_type: str,
-        conversation_id: UUID | None = None,
+        #conversation_id: UUID | None = None,
         importance: int = 1,
     ) -> UserMemory:
 
         memory = UserMemory(
             user_id=user_id,
-            conversation_id=conversation_id,
+            #conversation_id=conversation_id,
             content=content,
             memory_type=memory_type,
             importance=importance,

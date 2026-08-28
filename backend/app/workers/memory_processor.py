@@ -1,6 +1,5 @@
 import asyncio
 import json
-import logging
 from uuid import UUID
 
 from aiokafka import AIOKafkaConsumer
@@ -11,9 +10,7 @@ from app.core.kafka import (
     MEMORY_PROCESSING_GROUP,
 )
 
-from app.core.database import (
-    AsyncSessionLocal,
-)
+from app.core.database import AsyncSessionLocal
 
 from app.services.expired_conversation.expired_conversation_service import (
     expired_conversation_service,
@@ -27,30 +24,15 @@ from app.services.memory.memory_summary_service import (
     memory_summary_service,
 )
 
-from app.ai.providers import (
-    get_provider,
-)
+from app.ai.providers import get_provider
 
 
-logger = logging.getLogger(__name__)
+async def process_message(event: dict):
 
-
-async def process_message(
-    event: dict,
-) -> None:
-
-    logger.info(
-        "Kafka event received: %s",
-        event,
-    )
+    print("KAFKA EVENT RECEIVED:", event)
 
     expired_conversation_id = UUID(
         event["expired_conversation_id"]
-    )
-
-    logger.info(
-        "Processing expired conversation | id=%s",
-        expired_conversation_id,
     )
 
     async with AsyncSessionLocal() as db:
@@ -58,43 +40,38 @@ async def process_message(
         expired_conversation = (
             await expired_conversation_service.get_by_id(
                 db=db,
-                expired_conversation_id=(
-                    expired_conversation_id
-                ),
+                expired_conversation_id=expired_conversation_id,
             )
         )
 
         if expired_conversation is None:
 
-            logger.warning(
-                "Expired conversation not found | id=%s",
+            print(
+                "Expired conversation not found:",
                 expired_conversation_id,
             )
 
             return
 
-        logger.info(
-            "Expired conversation found | "
-            "status=%s",
-            expired_conversation.status,
-        )
 
         if expired_conversation.status == "PROCESSED":
 
-            logger.info(
-                "Conversation already processed | id=%s",
-                expired_conversation.id,
+            print(
+                "Conversation already processed:",
+                expired_conversation_id,
             )
 
             return
 
+
+        print(
+            "PROCESSING CONVERSATION:",
+            expired_conversation.id,
+        )
+
+
         messages = expired_conversation.messages
 
-        logger.info(
-            "Building memory summary | "
-            "message_count=%s",
-            len(messages),
-        )
 
         summary_messages = (
             memory_summary_service.build_messages(
@@ -102,23 +79,28 @@ async def process_message(
             )
         )
 
+
+        print("CALLING LLM FOR MEMORY SUMMARY")
+
+
         provider = get_provider(
             "ollama"
         )
 
-        logger.info(
-            "Calling Ollama for memory extraction"
-        )
 
         result = await provider.chat(
             messages=summary_messages,
         )
 
+
         memory_summary = result["content"]
 
-        logger.info(
-            "Memory generated successfully"
+
+        print(
+            "LLM SUMMARY GENERATED:",
+            memory_summary,
         )
+
 
         await memory_service.create_memory(
             db=db,
@@ -128,94 +110,93 @@ async def process_message(
             importance=1,
         )
 
-        logger.info(
-            "Memory saved to PostgreSQL"
-        )
+
+        print("MEMORY SAVED")
+
 
         await expired_conversation_service.mark_processed(
             db=db,
             conversation=expired_conversation,
         )
 
-        logger.info(
-            "Expired conversation marked PROCESSED | id=%s",
+
+        print(
+            "CONVERSATION MARKED AS PROCESSED:",
             expired_conversation.id,
         )
 
 
-async def consume() -> None:
-
-    logger.info(
-        "Starting memory worker | "
-        "topic=%s | group=%s | kafka=%s",
-        CONVERSATION_EXPIRED_TOPIC,
-        MEMORY_PROCESSING_GROUP,
-        KAFKA_BOOTSTRAP_SERVERS,
-    )
+async def consume():
 
     consumer = AIOKafkaConsumer(
+
         CONVERSATION_EXPIRED_TOPIC,
+
         bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+
         group_id=MEMORY_PROCESSING_GROUP,
+
         enable_auto_commit=False,
-        auto_offset_reset="earliest",
+
         value_deserializer=lambda value: json.loads(
             value.decode("utf-8")
         ),
+
     )
+
+
+    print("STARTING KAFKA MEMORY WORKER")
+
 
     await consumer.start()
 
-    logger.info(
-        "Memory worker connected to Kafka"
-    )
 
     try:
 
+        print(
+            "LISTENING TO TOPIC:",
+            CONVERSATION_EXPIRED_TOPIC,
+        )
+
+
         async for message in consumer:
 
-            logger.info(
-                "Kafka message consumed | "
-                "topic=%s | partition=%s | offset=%s",
-                message.topic,
-                message.partition,
-                message.offset,
-            )
-
             try:
+
+                print(
+                    "RAW KAFKA MESSAGE:",
+                    message.value,
+                )
+
 
                 await process_message(
                     message.value
                 )
 
+
                 await consumer.commit()
 
-                logger.info(
-                    "Kafka offset committed"
+
+                print("KAFKA OFFSET COMMITTED")
+
+
+            except Exception as error:
+
+                print(
+                    "MEMORY PROCESSING FAILED:",
+                    repr(error),
                 )
 
-            except Exception:
-
-                logger.exception(
-                    "Memory processing failed"
-                )
 
                 await asyncio.sleep(5)
 
-    finally:
 
-        logger.info(
-            "Stopping memory worker"
-        )
+    finally:
 
         await consumer.stop()
 
 
 if __name__ == "__main__":
-
-    logging.basicConfig(
-        level=logging.INFO,
-    )
 
     asyncio.run(
         consume()

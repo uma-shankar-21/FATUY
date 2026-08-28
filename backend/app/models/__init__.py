@@ -6,3 +6,4 @@ from app.models.existing.bank_account import BankAccount
 from app.models.expired_conversation import (
     ExpiredConversation,
 )
+from app.models.outbox import OutboxMessage

@@ -23,14 +23,19 @@ services:
 
   redis:
     image: redis:7-alpine
+
     ports:
       - "6379:6379"
+
+    command: >
+      redis-server
+      --notify-keyspace-events Ex
+
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
-
 
   kafka:
     image: apache/kafka:latest
@@ -77,6 +82,20 @@ services:
       - /app/node_modules
     depends_on:
       - backend
+
+  memory-worker:
+    build:
+      context: ./backend
+    command: python -m app.workers.memory_worker
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
 
 
 volumes:

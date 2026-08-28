@@ -11,12 +11,28 @@ class SessionExpiredError(Exception):
 
 class SessionService:
 
+    SESSION_PREFIX = "chat_session:"
+    EXPIRY_PREFIX = "conversation-expiry:"
+
+
     def _session_key(
         self,
         session_id: uuid.UUID,
     ) -> str:
 
-        return f"chat_session:{session_id}"
+        return (
+            f"{self.SESSION_PREFIX}{session_id}"
+        )
+
+
+    def _expiry_key(
+        self,
+        session_id: uuid.UUID,
+    ) -> str:
+
+        return (
+            f"{self.EXPIRY_PREFIX}{session_id}"
+        )
 
 
     async def create_session(
@@ -30,17 +46,38 @@ class SessionService:
             session_id
         )
 
+        expiry_key = self._expiry_key(
+            session_id
+        )
+
         session_data = {
             "session_id": str(session_id),
             "user_id": str(user_id),
             "messages": [],
         }
 
+
+        # ==========================================
+        # SAVE SESSION DATA
+        # NO TTL HERE
+        # ==========================================
+
         await redis_client.set(
             session_key,
             json.dumps(session_data),
+        )
+
+
+        # ==========================================
+        # EXPIRATION TRIGGER
+        # ==========================================
+
+        await redis_client.set(
+            expiry_key,
+            "1",
             ex=settings.SESSION_TTL_SECONDS,
         )
+
 
         return session_id
 
@@ -91,6 +128,11 @@ class SessionService:
             user_id=user_id,
         )
 
+
+        # ==========================================
+        # ADD MESSAGE
+        # ==========================================
+
         session_data["messages"].append(
             {
                 "role": role,
@@ -98,15 +140,37 @@ class SessionService:
             }
         )
 
+
         session_key = self._session_key(
             session_id
         )
 
+        expiry_key = self._expiry_key(
+            session_id
+        )
+
+
+        # ==========================================
+        # UPDATE SESSION DATA
+        # ==========================================
+
         await redis_client.set(
             session_key,
             json.dumps(session_data),
+        )
+
+
+        # ==========================================
+        # RESET TTL
+        # Every new message extends session lifetime
+        # ==========================================
+
+        await redis_client.set(
+            expiry_key,
+            "1",
             ex=settings.SESSION_TTL_SECONDS,
         )
+
 
         return session_data
 
@@ -152,12 +216,12 @@ class SessionService:
         session_id: uuid.UUID,
     ) -> int:
 
-        session_key = self._session_key(
+        expiry_key = self._expiry_key(
             session_id
         )
 
         return await redis_client.ttl(
-            session_key
+            expiry_key
         )
 
 

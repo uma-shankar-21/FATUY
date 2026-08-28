@@ -15,7 +15,7 @@ from sqlalchemy.orm import (
 from sqlalchemy.sql import func
 
 from app.core.database import Base
-
+from sqlalchemy import Integer, Text
 
 class ExpiredConversation(Base):
 
@@ -67,5 +67,16 @@ class ExpiredConversation(Base):
 
     processed_at: Mapped[DateTime | None] = mapped_column(
         DateTime(timezone=True),
+        nullable=True,
+    )
+
+    retry_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+
+    last_error: Mapped[str | None] = mapped_column(
+        Text,
         nullable=True,
     )
