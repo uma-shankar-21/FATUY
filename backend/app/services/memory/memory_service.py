@@ -180,7 +180,7 @@ class MemoryService:
         db: AsyncSession,
         user_id: UUID,
         query: str,
-        limit: int = 20,
+        limit: int = 5,
     ) -> list[dict]:
 
         relevant_memories = await self.search_relevant_memories(
