@@ -1,8 +1,6 @@
-# Banking AI Assistant
+# FATUY (Financial Assistant That Understands You)
 
-FATUY (Financial Assistant That Understands You)
-
-A full-stack AI banking assistant built with FastAPI, React, PostgreSQL, Redis, Kafka, and LLM providers. It gives customers a conversational interface to ask about balances, transactions, loans, and account activity while preserving short-term and long-term memory for personalized responses.
+A full-stack AI banking assistant built with Python, FastAPI, React, PostgreSQL, Redis, Kafka, and LLM providers( Ollama, vLLM). It gives customers a conversational interface to ask about balances, transactions, loans, and account activity while preserving short-term and long-term memory for personalized responses.
 
 ## Overview
 
@@ -10,7 +8,7 @@ This project combines:
 
 - a React frontend for login and dashboard experience
 - a FastAPI backend for APIs, auth, and AI orchestration
-- PostgreSQL for persistent customer and memory data
+- PostgreSQL for persistent customer and memory data (Simply Long term Memory)
 - Redis for short-term conversation sessions
 - Kafka for asynchronous background processing
 - Groq, Ollama, and vLLM support for LLM access
@@ -67,6 +65,44 @@ banking-ai/
 - Support for multiple AI providers
 - Banking data access for balances, transactions, and loans
 - Dashboard UI for customer information and account overview
+
+## How Short Term and Long-Term Memory works Inside Application
+
+Short Term Memory:
+
+- 1st when the user starts his 1st conversation, then immediately in redis, a session gets created with a random session_id : uuid.
+- 2nd Once he asks the questions and session starts, now the redis starts its Time to Live(TTL) simply countdown's back from 30mins.
+- 3rd In the time frame of 29 minutes 59 seconds to 0 minutes 1 second, if User asks any question then again the TTL resets to 30 minutes, like this the loop continues until user stops coversation.
+- 4th Once session is idle for More Than 30minutes, it gets closed and sends to Kafka to send the session data to LLM to give a summary of this short term conversations , and checks whether is there any useful context that is useful for storing in user's longterm memory(postgresDB) 
+
+
+Long Term Memory:
+
+- Once the Session data comes to Kafka broker, now its task is to send to LLM for summary and take it back and save it to PostgresDB for longterm Memory.
+- So whatIf there is a case if LLM goes down or DB goes down, and if there is any useful context of user is there, now will it be gone to void ??
+- No Here i have added a Layer which was inspired from whatsapp messaging, Kafka acts as the durable buffer between conversation expiration and memory processing. The event remains in Kafka until the Memory Worker successfully processes it.(simply whatsapp's single tick, double tick, blue tick mechanism). 
+```
+                Conversation Event Created
+                        ↓
+                Kafka receives event
+                        ↓
+                ✓ Single Tick
+                Event accepted by Kafka
+                        ↓
+                Memory Worker consumes event
+                        ↓
+                LLM processes conversation
+                        ↓
+                ✓✓ Double Tick
+                Memory processing completed
+                        ↓
+                PostgreSQL saves long-term memory
+                        ↓
+                🔵✓ Blue Tick
+                Memory successfully persisted
+```
+
+This keeps the user experience fast while asynchronously managing stored memory and expired conversations.
 
 ## Architecture
 
@@ -189,8 +225,8 @@ POST /api/v1/loans/history
 {
   "user_id": "<customer-id>",
   "message": "What is my total balance?",
-  "provider": "groq",
-  "session_id": null
+  "provider": "groq or ollama or vLLM",
+  "session_id": null(for 1st convo) or your active session_id
 }
 ```
 
@@ -202,9 +238,9 @@ POST /api/v1/loans/history
 4. Redis loads short-term conversation messages.
 5. PostgreSQL loads long-term relevant memories.
 6. Banking context is added from the user’s accounts, loans, and transactions.
-7. A prompt is built and sent to the selected LLM provider.
+7. A Mega prompt is built and sent to the selected LLM provider.
 8. The response is stored in Redis and returned to the user.
-9. Background workers handle session expiration and async memory processing.
+9. Background workers handle session expiration(30mins) and async memory processing.
 
 ## Database and Background Workers
 
