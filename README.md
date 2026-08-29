@@ -305,6 +305,7 @@ Verify:
 - The app is organized for development and demo use.
 - It is designed to be extensible for a production banking product.
 - The memory layer and AI orchestration are central to the project’s design.
+- For testing, you can set SESSION_TTL_SECONDS in env to a lower value like 80 seconds. In production, it should be higher.
 
 ## Summary
 
